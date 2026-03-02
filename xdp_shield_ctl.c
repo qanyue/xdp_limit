@@ -75,7 +75,7 @@ static void usage(const char *prog)
         "  whitelist-show\n"
         "\n"
         "配置:\n"
-        "  config-set <per_ip> <global>\n"
+        "  config-set <per_ip_syn> <global_syn>\n"
         "  config-show\n"
         "  enable\n"
         "  disable\n"
@@ -207,7 +207,7 @@ static int cmd_load(const char *ifname, const char *obj_path)
     }
 
     printf("✓ XDP Shield 已加载到 %s (ifindex=%d)\n", ifname, ifindex);
-    printf("  默认配置: 每IP=%d/s  全局=%d/s\n", DEFAULT_PER_IP_PPS_LIMIT, DEFAULT_GLOBAL_PPS_LIMIT);
+    printf("  默认配置: 每IP SYN=%d/s  全局 SYN=%d/s\n", DEFAULT_PER_IP_PPS_LIMIT, DEFAULT_GLOBAL_PPS_LIMIT);
     bpf_object__close(obj);
     return 0;
 }
@@ -324,9 +324,9 @@ static int cmd_config_set(const char *per_ip_s, const char *global_s)
         return 1;
     }
 
-    printf("✓ 速率限制已更新:\n");
-    printf("  每IP: %u 包/秒\n", cfg.per_ip_pps_limit);
-    printf("  全局: %u 包/秒\n", cfg.global_pps_limit);
+    printf("✓ 速率限制已更新 (仅 TCP SYN 无ACK):\n");
+    printf("  每IP: %u SYN/秒\n", cfg.per_ip_pps_limit);
+    printf("  全局: %u SYN/秒\n", cfg.global_pps_limit);
     return 0;
 }
 
@@ -341,8 +341,8 @@ static int cmd_config_show(void)
 
     printf("── XDP Shield 配置 ──\n");
     printf("  状态:     %s\n", cfg.enabled ? "✓ 已启用" : "✗ 已禁用 (旁路模式)");
-    printf("  每IP限制: %u 包/秒\n", cfg.per_ip_pps_limit);
-    printf("  全局限制: %u 包/秒\n", cfg.global_pps_limit);
+    printf("  每IP限制: %u SYN/秒\n", cfg.per_ip_pps_limit);
+    printf("  全局限制: %u SYN/秒\n", cfg.global_pps_limit);
     return 0;
 }
 
@@ -367,8 +367,8 @@ static int cmd_set_enabled(int enabled)
 static const char *stats_names[STATS_MAX] = {
     [STATS_PASSED]               = "放行",
     [STATS_DROPPED_BLACKLIST]    = "丢弃(黑名单)",
-    [STATS_DROPPED_PER_IP_LIMIT] = "丢弃(每IP限速)",
-    [STATS_DROPPED_GLOBAL_LIMIT] = "丢弃(全局限速)",
+    [STATS_DROPPED_PER_IP_LIMIT] = "丢弃(每IP SYN限速)",
+    [STATS_DROPPED_GLOBAL_LIMIT] = "丢弃(全局 SYN限速)",
     [STATS_WHITELISTED]          = "白名单放行",
     [STATS_TOTAL_PROCESSED]      = "总处理",
 };

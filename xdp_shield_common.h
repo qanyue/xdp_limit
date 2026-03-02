@@ -12,9 +12,9 @@
  *  常量定义
  * ───────────────────────────────────────────── */
 
-/* 默认速率限制阈值（每秒包数） */
-#define DEFAULT_PER_IP_PPS_LIMIT    10000    /* 每 IP 总包/秒 */
-#define DEFAULT_GLOBAL_PPS_LIMIT    50000  /* 全局总包/秒   */
+/* 默认速率限制阈值（每秒 SYN 包数，SYN=1 且 ACK=0） */
+#define DEFAULT_PER_IP_PPS_LIMIT    100    /* 每 IP SYN/秒 */
+#define DEFAULT_GLOBAL_PPS_LIMIT    50000  /* 全局 SYN/秒  */
 
 /* 时间窗口 (纳秒) */
 #define TIME_WINDOW_NS              1000000000ULL   /* 1 秒 */
@@ -53,8 +53,8 @@ struct global_rate_info {
 
 /* 可配置的速率限制参数 (存储在 config map 中) */
 struct shield_config {
-    __u32 per_ip_pps_limit;     /* 每 IP 包/秒上限 */
-    __u32 global_pps_limit;     /* 全局包/秒上限 */
+    __u32 per_ip_pps_limit;     /* 每 IP SYN/秒上限 (SYN=1 且 ACK=0) */
+    __u32 global_pps_limit;     /* 全局 SYN/秒上限 (SYN=1 且 ACK=0) */
     __u32 enabled;              /* 全局开关: 1=启用, 0=旁路 */
     __u32 _pad;                 /* 对齐填充 */
 };

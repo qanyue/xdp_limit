@@ -3,13 +3,14 @@
  * xdp_shield_kern.c — XDP/eBPF L4 DDoS 防护程序
  *
  * 功能概述:
- *   1. 每 IP 速率限制   — 每源 IP 总包速率限制
- *   2. 全局速率限制     — 全流量总 PPS 限制
+ *   1. 每 IP 速率限制   — 每源 IP 的 TCP SYN(无ACK) 速率限制
+ *   2. 全局速率限制     — 全局 TCP SYN(无ACK) PPS 限制
  *   3. IP 黑名单        — 命中即丢弃
  *   4. IP 白名单        — 命中即放行 (跳过所有检查)
  *   5. 实时统计         — per-CPU 计数器, 用户态可读取
  *
  * 设计要点:
+ *   - 仅对 TCP SYN(无ACK) 进行计数/限速，避免对正常数据包的 PPS 造成误伤
  *   - 使用 per-CPU array 做统计, 避免锁竞争
  *   - 使用 LRU hash 做 IP 速率跟踪, 自动淘汰冷条目
  *   - 所有阈值通过 config map 可在线调整, 无需重新加载
@@ -19,6 +20,8 @@
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/in.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
@@ -152,6 +155,10 @@ int xdp_shield(struct xdp_md *ctx)
     if ((void *)iph + ip_hdr_len > data_end)
         return XDP_PASS;
 
+    /* 忽略分片包 (offset!=0 或 MF=1 时无法可靠解析完整 L4) */
+    if (iph->frag_off & bpf_htons(0x3FFF))
+        return XDP_PASS;
+
     __u32 src_ip = iph->saddr;
 
     /* ══════════════════════════════════════
@@ -172,7 +179,26 @@ int xdp_shield(struct xdp_md *ctx)
     }
 
     /* ══════════════════════════════════════
-     *  速率限制检查 (无协议/端口区分)
+     *  L4: 仅对 TCP SYN(无ACK) 做限速
+     * ══════════════════════════════════════ */
+    int is_tcp_syn = 0;
+    if (iph->protocol == IPPROTO_TCP) {
+        struct tcphdr *tcph = (void *)iph + ip_hdr_len;
+        if ((void *)(tcph + 1) <= data_end) {
+            /* 仅处理 SYN 且不带 ACK 的握手首包 */
+            if (tcph->syn && !tcph->ack)
+                is_tcp_syn = 1;
+        }
+    }
+
+    /* 非 SYN 包不做 PPS 限速，直接放行 */
+    if (!is_tcp_syn) {
+        stats_inc(STATS_PASSED);
+        return XDP_PASS;
+    }
+
+    /* ══════════════════════════════════════
+     *  速率限制检查 (仅 TCP SYN 无ACK)
      * ══════════════════════════════════════ */
 
     __u64 now = bpf_ktime_get_ns();

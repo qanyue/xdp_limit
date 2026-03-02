@@ -130,8 +130,8 @@ cmd_setup_caddy() {
     # 2) 加载
     cmd_start "$iface"
 
-    # 3) 设置推荐的速率限制
-    log_info "设置推荐的速率限制..."
+    # 3) 设置推荐的速率限制 (仅 TCP SYN 无ACK)
+    log_info "设置推荐的速率限制 (仅 TCP SYN 无ACK)..."
     sudo "$CTL_BIN" config-set 1000 200000
 
     # 4) 白名单本机回环
